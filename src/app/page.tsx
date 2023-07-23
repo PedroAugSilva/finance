@@ -6,6 +6,9 @@ import { Plus, Bank, ArrowCircleDown, ArrowCircleUp } from "phosphor-react";
 import { RadioGroup } from "@/components/RadioGroup";
 import { useEffect, useState } from "react";
 import { formatValue } from "@/utils/formatValue";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import clsx from "clsx";
 
 interface ITransactionForm {
   description: string;
@@ -31,11 +34,23 @@ export default function Home() {
     revenue: 0,
   });
 
-  const { register, handleSubmit, control } = useForm<ITransactionForm>({
+  const schema = z.object({
+    description: z.string().nonempty("Há algum campo vazio"),
+    value: z.string().nonempty("Há algum campo vazio"),
+    revenue: z.string().nonempty("Há algum campo vazio"),
+  });
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<ITransactionForm>({
     defaultValues: {
       description: "",
       revenue: "revenue",
     },
+    resolver: zodResolver(schema),
   });
 
   const refreshTransactions = async () => {
@@ -56,7 +71,6 @@ export default function Home() {
   const handleCreateTransaction: SubmitHandler<ITransactionForm> = async (
     data
   ) => {
-    refreshTransactions();
     await fetch("/api/transaction", {
       method: "POST",
       body: JSON.stringify({
@@ -65,6 +79,7 @@ export default function Home() {
         value: Number(data.value),
       }),
     });
+    refreshTransactions();
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
@@ -75,63 +90,77 @@ export default function Home() {
   };
 
   return (
-    <section className="w-full max-w-4xl  h-max bg-zinc-900 rounded-xl p-4 flex items-center flex-row gap-4">
-      <aside className="h-max w-max flex flex-col items-center gap-4">
-        <Card
-          title="Saldo"
-          content={formatValue(balance!.balance)}
-          TitleIcon={Bank}
-        />
-        <Card
-          title="Entrada"
-          content={formatValue(balance!.revenue)}
-          TitleIcon={ArrowCircleUp}
-        />
-        <Card
-          title="Saída"
-          content={formatValue(balance!.expense)}
-          TitleIcon={ArrowCircleDown}
-        />
-      </aside>
-      <div className="flex flex-col items-start justify-start flex-1 h-full gap-4 ">
-        <form
-          className="w-full h-max flex items-center flex-row gap-4"
-          onSubmit={handleSubmit(handleCreateTransaction)}
-        >
-          <input
-            type="text"
-            className="bg-zinc-800 outline-none h-10 w-40 rounded-lg border-2 border-zinc-700 focus:border-violet-500 transition-all px-3 "
-            placeholder="Descrição..."
-            {...register("description")}
+    <>
+      <section className="w-full max-w-4xl  h-max bg-zinc-900 rounded-xl p-4 flex items-center flex-row gap-4">
+        <aside className="h-max w-max flex flex-col items-center gap-4">
+          <Card
+            title="Saldo"
+            content={formatValue(balance!.balance)}
+            TitleIcon={Bank}
           />
-          <input
-            type="number"
-            className="bg-zinc-800 outline-none h-10 w-40 rounded-lg border-2 border-zinc-700 focus:border-violet-500 transition-all px-3 "
-            placeholder="Valor..."
-            {...register("value")}
+          <Card
+            title="Entrada"
+            content={formatValue(balance!.revenue)}
+            TitleIcon={ArrowCircleUp}
           />
+          <Card
+            title="Saída"
+            content={formatValue(balance!.expense)}
+            TitleIcon={ArrowCircleDown}
+          />
+        </aside>
+        <div className="flex flex-col items-start justify-start flex-1 h-full gap-4 ">
+          <form
+            className="w-full h-max flex items-center flex-row gap-4"
+            onSubmit={handleSubmit(handleCreateTransaction)}
+          >
+            <input
+              type="text"
+              className={clsx(
+                "bg-zinc-800 outline-none h-10 w-40 rounded-lg border-2  focus:border-violet-500 transition-all px-3 ",
+                {
+                  "border-red-500": errors.description,
+                  "border-zinc-700": !errors.description,
+                }
+              )}
+              placeholder="Descrição..."
+              {...register("description")}
+            />
+            <input
+              type="number"
+              className={clsx(
+                "bg-zinc-800 outline-none h-10 w-40 rounded-lg border-2  focus:border-violet-500 transition-all px-3",
+                {
+                  "border-red-500": errors.value,
+                  "border-zinc-700": !errors.value,
+                }
+              )}
+              placeholder="Valor..."
+              {...register("value")}
+            />
 
-          <RadioGroup control={control} />
+            <RadioGroup control={control} />
 
-          <button className="flex-1 h-10 rounded-lg bg-violet-600 grid place-items-center transition-all hover:bg-violet-700 ">
-            <Plus size={28} />
-          </button>
-        </form>
-        <div className="w-full h-[360px] bg-zinc-800 rounded-xl p-3 gap-2 flex flex-col items-center">
-          {transactions.map((transaction, index) => {
-            const { description, revenue, value, id } = transaction;
-            return (
-              <Transaction
-                key={index}
-                description={description}
-                value={formatValue(value)}
-                revenue={revenue}
-                onDelete={() => handleDeleteTransaction(id)}
-              />
-            );
-          })}
+            <button className="flex-1 h-10 rounded-lg bg-violet-600 grid place-items-center transition-all hover:bg-violet-700 ">
+              <Plus size={28} />
+            </button>
+          </form>
+          <div className="w-full h-[360px] bg-zinc-800 rounded-xl p-3 gap-2 flex flex-col items-center">
+            {transactions.map((transaction, index) => {
+              const { description, revenue, value, id } = transaction;
+              return (
+                <Transaction
+                  key={index}
+                  description={description}
+                  value={formatValue(value)}
+                  revenue={revenue}
+                  onDelete={() => handleDeleteTransaction(id)}
+                />
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
