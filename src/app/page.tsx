@@ -1,5 +1,5 @@
 "use client";
-import { Card } from "@/components/Card";
+
 import { Transaction } from "@/components/Transaction";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { Plus, Bank, ArrowCircleDown, ArrowCircleUp } from "phosphor-react";
@@ -9,36 +9,35 @@ import { formatValue } from "@/utils/formatValue";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import clsx from "clsx";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/axios";
+import Card from "@/components/card";
 
-interface ITransactionForm {
-  description: string;
-  value: number;
-  revenue: "revenue" | "expense";
-}
+const schema = z.object({
+  description: z.string().nonempty(),
+  value: z.string().nonempty(),
+  revenue: z.enum(["revenue", "expense"]),
+});
 
-interface ITransaction extends ITransactionForm {
+type ITransactionForm = z.infer<typeof schema>;
+
+type ITransaction = ITransactionForm & {
   id: string;
-}
+};
 
-interface IBalance {
+interface IReceiveTransactions {
+  transactions: ITransaction[];
   balance: number;
   expense: number;
   revenue: number;
 }
 
 export default function Home() {
-  const [transactions, setTransactions] = useState<ITransaction[]>([]);
-  const [balance, setBalance] = useState<IBalance>({
-    balance: 0,
-    expense: 0,
-    revenue: 0,
-  });
+  const { user, signout } = useAuth();
 
-  const schema = z.object({
-    description: z.string().nonempty("Há algum campo vazio"),
-    value: z.string().nonempty("Há algum campo vazio"),
-    revenue: z.string().nonempty("Há algum campo vazio"),
-  });
+  const [transaction, setTransaction] = useState<IReceiveTransactions | null>(
+    null
+  );
 
   const {
     register,
@@ -54,60 +53,94 @@ export default function Home() {
   });
 
   const refreshTransactions = async () => {
-    const dataTransaction = await fetch("/api/transaction", {
-      method: "GET",
-    });
-    const dataBalance = await fetch("/api/balance", {
-      method: "GET",
-    });
-    setTransactions(await dataTransaction.json());
-    setBalance(await dataBalance.json());
+    const dataTransaction = await api.get("/transaction/" + user?.id);
+    setTransaction(dataTransaction.data);
   };
 
   useEffect(() => {
-    refreshTransactions();
-  }, []);
+    if (user) {
+      api.get("/transaction/" + user.id).then((response) => {
+        setTransaction(response.data);
+      });
+    }
+  }, [user]);
 
   const handleCreateTransaction: SubmitHandler<ITransactionForm> = async (
     data
   ) => {
-    await fetch("/api/transaction", {
-      method: "POST",
-      body: JSON.stringify({
-        description: data.description,
-        revenue: data.revenue,
-        value: Number(data.value),
-      }),
+    await api.post("/transaction/" + user!.id, {
+      description: data.description,
+      revenue: data.revenue,
+      value: Number(data.value),
     });
     refreshTransactions();
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
-    await fetch(`/api/transaction/${transactionId}`, {
-      method: "DELETE",
-    });
+    await api.delete(`/transaction/${transactionId}`);
     refreshTransactions();
   };
 
   return (
     <>
+      <div className="w-full max-w-4xl flex flex-row items-start gap-2 mb-2">
+        <span className="py-1.5 px-3 bg-zinc-900 rounded ">
+          {user?.username}
+        </span>
+        <button
+          className="py-1.5 px-3 bg-red-900 rounded transition-all hover:bg-red-800"
+          onClick={signout}
+        >
+          loggout
+        </button>
+      </div>
       <section className="w-full max-w-4xl  h-max bg-zinc-900 rounded-xl p-4 flex items-center flex-row gap-4">
         <aside className="h-max w-max flex flex-col items-center gap-4">
-          <Card
-            title="Saldo"
-            content={formatValue(balance!.balance)}
-            TitleIcon={Bank}
-          />
-          <Card
-            title="Entrada"
-            content={formatValue(balance!.revenue)}
-            TitleIcon={ArrowCircleUp}
-          />
-          <Card
-            title="Saída"
-            content={formatValue(balance!.expense)}
-            TitleIcon={ArrowCircleDown}
-          />
+          <Card.Root>
+            <div className="w-full flex flex-row justify-between items-center">
+              <Card.Title title="Saldo" />
+              <Card.Icon icon={Bank} className="text-3xl" />
+            </div>
+            <Card.Content
+              content={
+                transaction?.balance
+                  ? formatValue(transaction.balance)
+                  : "loading..."
+              }
+            />
+          </Card.Root>
+          <Card.Root>
+            <div className="w-full flex flex-row justify-between items-center">
+              <Card.Title title="Entrada" />
+              <Card.Icon
+                icon={ArrowCircleUp}
+                className="text-3xl text-emerald-500"
+              />
+            </div>
+            <Card.Content
+              content={
+                transaction?.revenue
+                  ? formatValue(transaction.revenue)
+                  : "loading..."
+              }
+            />
+          </Card.Root>
+          <Card.Root>
+            <div className="w-full flex flex-row justify-between items-center">
+              <Card.Title title="Saída" />
+              <Card.Icon
+                icon={ArrowCircleDown}
+                className="text-3xl text-red-500"
+              />
+            </div>
+            <Card.Content
+              content={
+                transaction?.expense
+                  ? formatValue(transaction.expense)
+                  : "loading..."
+              }
+            />
+          </Card.Root>
         </aside>
         <div className="flex flex-col items-start justify-start flex-1 h-full gap-4 ">
           <form
@@ -146,13 +179,14 @@ export default function Home() {
             </button>
           </form>
           <div className="w-full h-[360px] bg-zinc-800 rounded-xl p-3 gap-2 flex flex-col items-center">
-            {transactions.map((transaction, index) => {
-              const { description, revenue, value, id } = transaction;
+            {transaction?.transactions?.map((transaction, index) => {
+              const { description, id, revenue, value } = transaction;
+
               return (
                 <Transaction
                   key={index}
                   description={description}
-                  value={formatValue(value)}
+                  value={formatValue(Number(value))}
                   revenue={revenue}
                   onDelete={() => handleDeleteTransaction(id)}
                 />

@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
+import { AuthProvider } from "@/hooks/useAuth";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,10 +19,10 @@ export default function RootLayout({
       <body
         className={
           inter.className +
-          " text-zinc-200 bg-zinc-950 h-screen grid place-items-center "
+          " text-zinc-200 bg-zinc-950 h-screen flex items-center justify-center flex-col "
         }
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

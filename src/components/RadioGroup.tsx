@@ -4,7 +4,7 @@ import { Controller, Control } from "react-hook-form";
 
 interface ITransactionForm {
   description: string;
-  value: number;
+  value: string;
   revenue: "revenue" | "expense";
 }
 
