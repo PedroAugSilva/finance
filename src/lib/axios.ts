@@ -4,7 +4,7 @@ import { parseCookies } from "nookies";
 const { "finance.token": token } = parseCookies();
 
 export const api = axios.create({
-  baseURL: "http://localhost:3000/api",
+  baseURL: process.env.API_URL + "/api" || "http://localhost:3000/api",
 });
 
 if (token) {
